@@ -1,0 +1,47 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-table-products
+      author: Sof
+      comment: first liquibase migration
+      changes:
+        - createTable:
+            tableName: products
+            columns:
+              - column:
+                  name: product_id
+                  type: int
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: category
+                  type: varchar(200)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: barcode
+                  type: varchar(50)
+                  constraints:
+                    unique: true
+                    nullable: false
+              - column:
+                  name: brand
+                  type: varchar(100)
+              - column:
+                  name: calories
+                  type: decimal(10, 2)
+              - column:
+                  name: proteins
+                  type: decimal(10, 2)
+              - column:
+                  name: fats
+                  type: decimal(10, 2)
+              - column:
+                  name: carbohydrates
+                  type: decimal(10, 2)

@@ -1,0 +1,43 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-table-product-instances
+      author: Sof
+      comment: second liquibase migration
+      changes:
+        - createTable:
+            tableName: product_instances
+            columns:
+              - column:
+                  name: instance_id
+                  type: int
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: count
+                  type: int
+                  constraints:
+                    nullable: false
+                    checkConstraint: count > 1, count < 500
+              - column:
+                  name: created_at
+                  type: datetime
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expiration_date
+                  type: date
+                  constraints:
+                    nullable: false
+              - column:
+                  name: product_id
+                  type: int
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: product_instances
+            baseColumnNames: product_id
+            referencedTableName: products
+            referencedColumnNames: product_id
+            constraintName: product_instances_products_fk
