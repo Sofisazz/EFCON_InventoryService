@@ -2,6 +2,8 @@ package com.example.inventoryservice.service;
 
 import com.example.inventoryservice.dto.ProductDto;
 import com.example.inventoryservice.dto.ProductInstanceDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -9,7 +11,7 @@ import java.util.List;
 @Service
 public interface ProductService {
 
-    List<ProductDto> findAllProducts();
+    Page<ProductDto> findAllProducts(Pageable pageable);
     ProductDto findProductById(int id);
     ProductDto createProduct(ProductDto productDto);
     ProductDto updateProduct(int id,ProductDto productDto);

@@ -10,6 +10,7 @@ import com.example.inventoryservice.repository.ProductRepository;
 import com.example.inventoryservice.service.ProductInstanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,6 +34,7 @@ public class ProductInstanceServiceImpl implements ProductInstanceService {
                 .orElseThrow(() -> new MissingException("Экземляр продукта id " + id + " не существует"));
     }
 
+    @Transactional
     @Override
     public ProductInstanceDto createProductInstance(ProductInstanceDto productInstanceDto) {
         Product existingProduct = findProductForInstance(productInstanceDto);
@@ -43,17 +45,20 @@ public class ProductInstanceServiceImpl implements ProductInstanceService {
         return  productInstanceMapper.toDto(productInstanceRepository.save(receivedProductInstance));
     }
 
+    @Transactional
     @Override
     public ProductInstanceDto updateProductInstance(int id, ProductInstanceDto productInstanceDto) {
         ProductInstance receivedProductInstance = productInstanceRepository.findById(id)
                 .orElseThrow(() -> new MissingException("Экземляр продукт id " + id + " не существует"));
 
         Product existingProduct = findProductForInstance(productInstanceDto);
-        ProductInstance newProductInstance = refreshProductInstance(receivedProductInstance, productInstanceDto, existingProduct);
+        productInstanceMapper.updateFromDto(productInstanceDto, receivedProductInstance);
+        receivedProductInstance.setProduct(existingProduct);
 
-        return productInstanceMapper.toDto(productInstanceRepository.save(newProductInstance));
+        return productInstanceMapper.toDto(productInstanceRepository.save(receivedProductInstance));
     }
 
+    @Transactional
     @Override
     public void deleteProductInstanceById(int id)  {
         if(productInstanceRepository.existsById(id)) {
@@ -68,15 +73,5 @@ public class ProductInstanceServiceImpl implements ProductInstanceService {
         }
 
         return productRepository.findById(productId).orElseThrow();
-    }
-
-
-    private ProductInstance refreshProductInstance(ProductInstance productInstance, ProductInstanceDto productInstanceDto, Product product){
-        productInstance.setCount(productInstanceDto.getCount());
-        productInstance.setCreatedAt(productInstanceDto.getCreatedAt());
-        productInstance.setExpirationDate(productInstanceDto.getExpirationDate());
-        productInstance.setProduct(product);
-
-        return productInstance;
     }
 }

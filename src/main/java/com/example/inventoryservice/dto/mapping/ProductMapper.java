@@ -5,6 +5,7 @@ import com.example.inventoryservice.entity.Product;
 import com.example.inventoryservice.entity.ProductInstance;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
 @Mapper(componentModel = "spring", uses = {ProductInstanceMapper.class})
@@ -12,6 +13,9 @@ public interface ProductMapper {
 
     ProductDto toDto(Product product);
     Product toEntity(ProductDto productDto);
+
+    @Mapping(target = "id", ignore = true)
+    void updateFromDto(ProductDto productDto, @MappingTarget Product product);
 
     @AfterMapping
     default void linkProductInstancesWithProduct(@MappingTarget Product product) {

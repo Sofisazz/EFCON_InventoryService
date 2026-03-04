@@ -4,7 +4,12 @@ import com.example.inventoryservice.dto.ProductDto;
 import com.example.inventoryservice.dto.ProductInstanceDto;
 import com.example.inventoryservice.service.ProductService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,8 +21,10 @@ public class ProductControllerV1 {
     private final ProductService productService;
 
     @GetMapping()
-    public List<ProductDto> getAllProducts() {
-        return productService.findAllProducts();
+    public Page<ProductDto> getAllProducts(@RequestParam(value = "offset", defaultValue = "0") @Min(0) Integer offset,
+                                           @RequestParam(value = "limit", defaultValue = "2") @Min(1) @Max(100) Integer limit,
+                                           @RequestParam(value = "sortName", defaultValue = "name") String  sortName) {
+        return productService.findAllProducts(PageRequest.of(offset, limit, Sort.by(sortName)));
     }
 
     @GetMapping("/{id}")

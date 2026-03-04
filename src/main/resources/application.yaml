@@ -13,3 +13,9 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/master.yaml
     enabled: true
+  http:
+    client:
+      connect-timeout: 60s
+
+openfoodfacts:
+    url: https://world.openfoodfacts.org/api/v0/product/
