@@ -1,4 +1,4 @@
-package com.example.inventoryservice.service.serviceImpl;
+package com.example.inventoryservice.service.V1.serviceImpl;
 
 import com.example.inventoryservice.dto.*;
 import com.example.inventoryservice.dto.mapping.ProductInstanceMapper;
@@ -11,7 +11,7 @@ import com.example.inventoryservice.exceptions.UpdateProductException;
 import com.example.inventoryservice.map.CategoryMap;
 import com.example.inventoryservice.repository.ProductInstanceRepository;
 import com.example.inventoryservice.repository.ProductRepository;
-import com.example.inventoryservice.service.ProductService;
+import com.example.inventoryservice.service.V1.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,7 +59,9 @@ public class ProductServiceImpl implements ProductService {
         }
 
         Product product = productMapper.toEntity(productDto);
-        return productMapper.toDto(productRepository.save(product));
+        productRepository.save(product);
+
+        return productMapper.toDto(product);
     }
 
     @Transactional
@@ -70,6 +72,7 @@ public class ProductServiceImpl implements ProductService {
 
         existProductByBarcode(productDto.getBarcode(), id);
         productMapper.updateFromDto(productDto, receivedProduct);
+        productRepository.flush();
 
         return productMapper.toDto(productRepository.save(receivedProduct));
     }

@@ -1,8 +1,7 @@
 package com.example.inventoryservice.entity;
 
+import com.example.inventoryservice.enums.Measure;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,12 +20,15 @@ public class ProductInstance {
     @Column(name = "instance_id")
     private int id;
 
-    @Max(value = 500, message = "Максимальное число продукта - 500 шт.")
-    @Min(value = 1, message = "Минимальное число продукта - 1 шт.")
+    @NotNull(message = "Количество экземпляра обязательно")
     @Column(nullable = false)
-    private int count;
+    private double count;
 
-    @NotNull(message = "Дата создания обязателен")
+    @NotNull(message = "Единица измерения обязательна")
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Measure unit;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -37,4 +39,6 @@ public class ProductInstance {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    private Integer userId;
 }

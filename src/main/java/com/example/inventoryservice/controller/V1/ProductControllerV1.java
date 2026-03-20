@@ -1,8 +1,8 @@
-package com.example.inventoryservice.controller;
+package com.example.inventoryservice.controller.V1;
 
 import com.example.inventoryservice.dto.ProductDto;
 import com.example.inventoryservice.dto.ProductInstanceDto;
-import com.example.inventoryservice.service.ProductService;
+import com.example.inventoryservice.service.V1.ProductService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -45,7 +45,7 @@ public class ProductControllerV1 {
     @DeleteMapping("/{id}")
     public void deleteProduct(@PathVariable int id)  {
         productService.deleteProductById(id);
-        }
+    }
 
     @GetMapping("/{idPr}/instances")
     public List<ProductInstanceDto> getAllInstancesForProduct(@PathVariable int idPr) {

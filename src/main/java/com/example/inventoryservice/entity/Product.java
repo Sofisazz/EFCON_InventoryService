@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,7 +34,7 @@ public class Product {
     private Categories category;
 
     @NotBlank(message = "Штрихкод обязателен")
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String barcode;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -43,7 +44,21 @@ public class Product {
     private String brand;
 
     private double calories;
+
+    @ColumnDefault("0.0")
     private double proteins;
+
+    @ColumnDefault("0.0")
     private double fats;
+
+    @ColumnDefault("0.0")
     private double carbohydrates;
+
+    private Integer ownerId;
+
+    @PrePersist
+    @PreUpdate
+    public void calculateCalories() {
+        this.calories = (this.proteins * 4.0) + (this.fats * 9.0) + (this.carbohydrates * 4.0);
+    }
 }

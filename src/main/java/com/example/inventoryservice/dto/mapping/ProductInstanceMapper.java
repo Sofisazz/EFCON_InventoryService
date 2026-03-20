@@ -17,5 +17,6 @@ public interface ProductInstanceMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "product", ignore = true)
+    @Mapping(target = "userId", ignore = true)
     void updateFromDto(ProductInstanceDto productInstanceDto, @MappingTarget ProductInstance productInstance);
 }

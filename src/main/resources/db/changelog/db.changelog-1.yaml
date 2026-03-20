@@ -28,7 +28,6 @@ databaseChangeLog:
                   name: barcode
                   type: varchar(50)
                   constraints:
-                    unique: true
                     nullable: false
               - column:
                   name: brand
@@ -45,3 +44,6 @@ databaseChangeLog:
               - column:
                   name: carbohydrates
                   type: decimal(10, 2)
+              - column:
+                  name: owner_id
+                  type: int

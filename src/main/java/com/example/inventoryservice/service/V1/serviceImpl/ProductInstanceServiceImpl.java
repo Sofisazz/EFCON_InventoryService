@@ -1,4 +1,4 @@
-package com.example.inventoryservice.service.serviceImpl;
+package com.example.inventoryservice.service.V1.serviceImpl;
 
 import com.example.inventoryservice.dto.ProductInstanceDto;
 import com.example.inventoryservice.dto.mapping.ProductInstanceMapper;
@@ -7,11 +7,10 @@ import com.example.inventoryservice.entity.ProductInstance;
 import com.example.inventoryservice.exceptions.MissingException;
 import com.example.inventoryservice.repository.ProductInstanceRepository;
 import com.example.inventoryservice.repository.ProductRepository;
-import com.example.inventoryservice.service.ProductInstanceService;
+import com.example.inventoryservice.service.V1.ProductInstanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -42,7 +41,7 @@ public class ProductInstanceServiceImpl implements ProductInstanceService {
         ProductInstance receivedProductInstance = productInstanceMapper.toEntity(productInstanceDto);
         receivedProductInstance.setProduct(existingProduct);
 
-        return  productInstanceMapper.toDto(productInstanceRepository.save(receivedProductInstance));
+        return productInstanceMapper.toDto(productInstanceRepository.save(receivedProductInstance));
     }
 
     @Transactional
