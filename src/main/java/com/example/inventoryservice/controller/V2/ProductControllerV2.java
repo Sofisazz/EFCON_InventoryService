@@ -18,7 +18,7 @@ public class ProductControllerV2 {
 
     private final ProductServiceV2 productService;
 
-    @GetMapping
+    @GetMapping()
     List<ProductDto> findAllProducts(@RequestParam Integer userId){
         return productService.findAllProducts(userId);
     }

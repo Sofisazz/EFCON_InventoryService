@@ -13,6 +13,9 @@ import com.example.inventoryservice.map.CategoryMap;
 import com.example.inventoryservice.repository.ProductInstanceRepository;
 import com.example.inventoryservice.repository.ProductRepository;
 import com.example.inventoryservice.service.V2.ProductServiceV2;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +26,7 @@ import org.springframework.web.client.RestClient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Supplier;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -39,14 +43,17 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
     private final RestClient restClient;
     private final UserClient userClient;
 
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
+
     @Value("${openfoodfacts.url}")
     private String url;
 
 
-
     @Override
-    public List<ProductDto> findAllProducts(Integer ownerId) {
-        List<Product> products = productRepository.findByOwnerIdIsNullOrOwnerId(ownerId);
+    public List<ProductDto> findAllProducts(Integer userId) {
+        circuitBreakerUserExists(userId);
+
+        List<Product> products = productRepository.findByOwnerIdIsNullOrOwnerId(userId);
         List<ProductDto> productDtos;
         productDtos = products.stream().map(productMapper::toDto).toList();
 
@@ -55,9 +62,7 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
 
     @Override
     public List<ProductDto> findProductsByName(String name, Integer userId) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не найден");
-        }
+        circuitBreakerUserExists(userId);
 
         List<Product> globalProducts = productRepository.findByNameContainingIgnoreCaseAndOwnerIdIsNull(name);
         List<Product> userProducts = productRepository.findByNameContainingIgnoreCaseAndOwnerId(name, userId);
@@ -76,8 +81,8 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
     @Transactional
     @Override
     public ProductDto createProduct(ProductDto productDto, Integer userId) {
-        if(userId != null && !userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не найден");
+        if(userId != null) {
+            circuitBreakerUserExists(userId);
         }
 
         String barcode = productDto.getBarcode();
@@ -107,9 +112,7 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
                 throw new ExistsException("Разработчик может изменять только глобальные продукты");
             }
         } else {
-            if (!userClient.checkUserExists(userId)) {
-                throw new MissingException("Пользователь с id '" + userId + "' не найден");
-            }
+            circuitBreakerUserExists(userId);
 
             if (product.getOwnerId() == null) {
                 throw new ExistsException("Пользователи не могут изменять глобальные продукты");
@@ -120,15 +123,17 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
             }
         }
 
-            existProductByBarcode(productDto.getBarcode(), id, userId);
-            productMapper.updateFromDto(productDto, product);
-            productRepository.flush();
+        existProductByBarcode(productDto.getBarcode(), id, userId);
+        productMapper.updateFromDto(productDto, product);
+        productRepository.flush();
 
-            return productMapper.toDto(product);
+        return productMapper.toDto(product);
     }
 
     @Override
     public void consumeProduct(int userId, String productName, double amount, Measure recipeUnit) {
+        circuitBreakerUserExists(userId);
+
         List<Product> products = productRepository.findByNameIgnoreCaseAndOwnerIdIsNull(productName);
         List<Product> productsUser = productRepository.findByNameIgnoreCaseAndOwnerId(productName, userId);
         products.addAll(productsUser);
@@ -203,6 +208,8 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
 
     @Override
     public void returnProduct(int userId, String productName, double amount, Measure unit) {
+        circuitBreakerUserExists(userId);
+
         List<Product> products = productRepository.findByNameIgnoreCaseAndOwnerIdIsNull(productName);
         List<Product> productsUser = productRepository.findByNameIgnoreCaseAndOwnerId(productName, userId);
         products.addAll(productsUser);
@@ -225,7 +232,7 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
             targetInstance.setCount(targetInstance.getCount() + amountToAdd);
             productInstanceRepository.save(targetInstance);
 
-            } else {
+        } else {
             ProductInstance newInstance = createProductInstance(product, userId, amount, unit, today);
 
             productInstanceRepository.save(newInstance);
@@ -246,9 +253,7 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
             return;
         }
 
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не найден");
-        }
+        circuitBreakerUserExists(userId);
 
         if (product.getOwnerId() == null) {
             throw new ExistsException("Невозможно удалить продукт из глобальной базы. Вы можете удалить только свои личные продукты");
@@ -264,9 +269,7 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
     @Transactional
     @Override
     public ProductDto findOrCreateByBarcode(String barcode, Integer userId) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не найден");
-        }
+        circuitBreakerUserExists(userId);
 
         Optional<Product> existingGlobal = productRepository.findByBarcodeAndOwnerIdIsNull(barcode);
         if (existingGlobal.isPresent()) {
@@ -296,9 +299,7 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
 
     @Override
     public List<ProductAvailabilityDto> checkProductsAvailability(Integer userId, List<String> productNames) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не найден");
-        }
+        circuitBreakerUserExists(userId);
 
         List<String> checkProductNames= Optional.ofNullable(productNames).orElse(List.of());
 
@@ -343,9 +344,7 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
 
     @Override
     public List<ProductStatusDto> generateShoppingList(Integer userId, List<String> productNames) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не найден");
-        }
+        circuitBreakerUserExists(userId);
 
         List<String> checkProductNames = Optional.ofNullable(productNames).orElse(List.of());
         LocalDate today = LocalDate.now().minusDays(1);
@@ -359,12 +358,11 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
             Measure resultUnit = Measure.PCS;
             boolean isAvailable = false;
 
-            if (!products.isEmpty()) {
-                Product product = products.get(0);
-
+            for (Product product : products) {
                 List<ProductInstance> instances = productInstanceRepository.findByProductIdAndUserIdAndExpirationDateAfter(product.getId(), userId, today);
 
                 if (!instances.isEmpty()) {
+                    isAvailable = true;
                     resultUnit = instances.get(0).getUnit();
 
                     for (ProductInstance instance : instances) {
@@ -373,10 +371,6 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
 
                         double baseValue = convertToBase(count, unit);
                         totalBaseAmount += baseValue;
-                    }
-
-                    if (totalBaseAmount > 0.001) {
-                        isAvailable = true;
                     }
                 }
             }
@@ -520,5 +514,28 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
             default -> baseValue;
         };
 
+    }
+
+    private void circuitBreakerUserExists(Integer userId){
+        Supplier<Boolean> supplier = () -> userClient.checkUserExists(userId);
+
+        CircuitBreaker cb = circuitBreakerRegistry.circuitBreaker("userService");
+
+        Supplier<Boolean> decoratedSupplier = CircuitBreaker.decorateSupplier(cb, supplier);
+
+        try {
+            boolean exists = decoratedSupplier.get();
+            if (!exists) {
+                throw new MissingException("Пользователя с id '" + userId + "' не существует");
+            }
+        } catch (CallNotPermittedException e) {
+            log.warn("Circuit Breaker разомкнут для userService. Сервис недоступен");
+            throw new MissingException("Сервис пользователей временно недоступен");
+        } catch (MissingException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Ошибка при вызове user-service", e);
+            throw new MissingException("Ошибка связи с сервисом пользователей");
+        }
     }
 }

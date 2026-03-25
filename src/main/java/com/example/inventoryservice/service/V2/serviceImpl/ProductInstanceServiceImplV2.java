@@ -13,7 +13,11 @@ import com.example.inventoryservice.feignclient.UserClient;
 import com.example.inventoryservice.repository.ProductInstanceRepository;
 import com.example.inventoryservice.repository.ProductRepository;
 import com.example.inventoryservice.service.V2.ProductInstanceServiceV2;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +25,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class ProductInstanceServiceImplV2 implements ProductInstanceServiceV2 {
@@ -31,13 +37,14 @@ public class ProductInstanceServiceImplV2 implements ProductInstanceServiceV2 {
 
     private final ProductInstanceRepository productInstanceRepository;
     private final ProductRepository productRepository;
+
     private final UserClient userClient;
+
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     public List<ProductInstanceDto> findInstancesForUser(Integer userId) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не существует");
-        }
+        circuitBreakerUserExists(userId);
 
         List<ProductInstance> instances = productInstanceRepository.findByUserId(userId);
         List<ProductInstanceDto> instanceDtos;
@@ -48,9 +55,7 @@ public class ProductInstanceServiceImplV2 implements ProductInstanceServiceV2 {
 
     @Override
     public ProductInstanceDto findProductInstanceById(int id, Integer userId) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не существует");
-        }
+        circuitBreakerUserExists(userId);
 
         ProductInstance productInstance = productInstanceRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new MissingException("Экземпляр продукта id '" + id + "' не найден у пользователя " + userId));
@@ -61,9 +66,7 @@ public class ProductInstanceServiceImplV2 implements ProductInstanceServiceV2 {
     @Transactional
     @Override
     public ProductInstanceDto createProductInstanceForUser(ProductInstanceDto productInstanceDto, Integer userId) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не существует");
-        }
+        circuitBreakerUserExists(userId);
 
         Product product = productRepository.findById(productInstanceDto.getProductId())
                 .orElseThrow(() -> new MissingException("Продукт с id " + productInstanceDto.getProductId() + " не найден"));
@@ -88,9 +91,7 @@ public class ProductInstanceServiceImplV2 implements ProductInstanceServiceV2 {
     @Transactional
     @Override
     public ProductInstanceDto updateProductInstance(int id, Integer userId, ProductInstanceDto productInstanceDto) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не существует");
-        }
+        circuitBreakerUserExists(userId);
 
         ProductInstance receivedProductInstance = productInstanceRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new MissingException("Экземляр продукта id " + id + " не существует"));
@@ -108,9 +109,7 @@ public class ProductInstanceServiceImplV2 implements ProductInstanceServiceV2 {
     @Transactional
     @Override
     public void deleteProductInstanceById(int id, Integer userId) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не существует");
-        }
+        circuitBreakerUserExists(userId);
 
         if(!productInstanceRepository.existsByIdAndUserId(id, userId)) {
             throw new MissingException("Экземпляр продукта id " + id + " не существует");
@@ -119,21 +118,9 @@ public class ProductInstanceServiceImplV2 implements ProductInstanceServiceV2 {
         productInstanceRepository.deleteById(id);
     }
 
-    private Product findProductForInstance(ProductInstanceDto productInstanceDto) {
-        int productId = productInstanceDto.getProductId();
-        if (!productRepository.existsById(productId)) {
-            throw new MissingException("Для экземляра продукта не верно указан id продукта или вовсе не указан");
-        }
-
-        return productRepository.findById(productId).orElseThrow();
-    }
-
-
     @Override
     public List<TransferProductDto> getExpiring(Integer userId) {
-        if (!userClient.checkUserExists(userId)) {
-            throw new MissingException("Пользователь с id '" + userId + "' не существует");
-        }
+        circuitBreakerUserExists(userId);
 
         LocalDate today = LocalDate.now();
         LocalDate futureDate = today.plusDays(5);
@@ -175,10 +162,43 @@ public class ProductInstanceServiceImplV2 implements ProductInstanceServiceV2 {
         return result;
     }
 
+
+    private Product findProductForInstance(ProductInstanceDto productInstanceDto) {
+        int productId = productInstanceDto.getProductId();
+        if (!productRepository.existsById(productId)) {
+            throw new MissingException("Для экземляра продукта не верно указан id продукта или вовсе не указан");
+        }
+
+        return productRepository.findById(productId).orElseThrow();
+    }
+
     private TransferProductDto createTransferProduct(Product product) {
         TransferProductDto transferProductDto = new TransferProductDto();
         transferProductMapper.updateFromEntity(product, transferProductDto);
 
         return transferProductDto;
+    }
+
+    private void circuitBreakerUserExists(Integer userId){
+        Supplier<Boolean> supplier = () -> userClient.checkUserExists(userId);
+
+        CircuitBreaker cb = circuitBreakerRegistry.circuitBreaker("userService");
+
+        Supplier<Boolean> decoratedSupplier = CircuitBreaker.decorateSupplier(cb, supplier);
+
+        try {
+            boolean exists = decoratedSupplier.get();
+            if (!exists) {
+                throw new MissingException("Пользователя с id '" + userId + "' не существует");
+            }
+        } catch (CallNotPermittedException e) {
+            log.warn("Circuit Breaker разомкнут для userService. Сервис недоступен");
+            throw new MissingException("Сервис пользователей временно недоступен");
+        } catch (MissingException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Ошибка при вызове user-service", e);
+            throw new MissingException("Ошибка связи с сервисом пользователей");
+        }
     }
 }
