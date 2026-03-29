@@ -1,4 +1,4 @@
-package com.example.inventoryservice.service;
+package com.example.inventoryservice.service.V1;
 
 import com.example.inventoryservice.dto.ProductDto;
 import com.example.inventoryservice.dto.ProductInstanceDto;

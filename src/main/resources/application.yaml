@@ -2,6 +2,8 @@ server:
   port: 8086
 
 spring:
+  application:
+    name: inventory-service
   datasource:
     url: jdbc:postgresql://localhost:5434/inventory_service
     username: postgres
@@ -16,6 +18,44 @@ spring:
   http:
     client:
       connect-timeout: 60s
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: my-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 openfoodfacts:
     url: https://world.openfoodfacts.org/api/v0/product/
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:9090/eureka/
+  instance:
+    prefer-ip-address: true
+
+resilience4j.circuitbreaker:
+  configs:
+    default:
+      registerHealthIndicator: true
+      slidingWindowSize: 10
+      minimumNumberOfCalls: 5
+      permittedNumberOfCallsInHalfOpenState: 3
+      automaticTransitionFromOpenToHalfOpenEnabled: true
+      failureRateThreshold: 50
+      waitDurationInOpenState: 10000
+      eventConsumerBufferSize: 10
+      ignoreExceptions:
+        - com.example.inventoryservice.exceptions.MissingException
+        - feign.FeignException$BadRequest
+  instances:
+    userService:
+      baseConfig: default
+      waitDurationInOpenState: 15s
+      failureRateThreshold: 60

@@ -1,7 +1,7 @@
-package com.example.inventoryservice.controller;
+package com.example.inventoryservice.controller.V1;
 
 import com.example.inventoryservice.dto.ProductInstanceDto;
-import com.example.inventoryservice.service.ProductInstanceService;
+import com.example.inventoryservice.service.V1.ProductInstanceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

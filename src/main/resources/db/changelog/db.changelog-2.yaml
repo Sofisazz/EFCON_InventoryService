@@ -16,10 +16,13 @@ databaseChangeLog:
                     nullable: false
               - column:
                   name: count
-                  type: int
+                  type: decimal(10,2)
                   constraints:
                     nullable: false
                     checkConstraint: count > 1, count < 500
+              - column:
+                  name: unit
+                  type: varchar(5)
               - column:
                   name: created_at
                   type: datetime
@@ -35,6 +38,9 @@ databaseChangeLog:
                   type: int
                   constraints:
                     nullable: false
+              - column:
+                  name: user_id
+                  type: int
         - addForeignKeyConstraint:
             baseTableName: product_instances
             baseColumnNames: product_id
