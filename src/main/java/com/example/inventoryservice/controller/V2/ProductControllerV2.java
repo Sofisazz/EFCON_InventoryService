@@ -1,6 +1,5 @@
 package com.example.inventoryservice.controller.V2;
 
-import com.example.inventoryservice.dto.ConsumeProductDto;
 import com.example.inventoryservice.dto.ProductAvailabilityDto;
 import com.example.inventoryservice.dto.ProductDto;
 import com.example.inventoryservice.dto.ProductStatusDto;
@@ -64,15 +63,5 @@ public class ProductControllerV2 {
     public List<ProductStatusDto> generateShoppingList(@RequestParam Integer userId,
                                                        @RequestBody List<String> productNames) {
         return productService.generateShoppingList(userId, productNames);
-    }
-
-    @PostMapping("/consume")
-    public void consumeProduct(@RequestBody ConsumeProductDto dto) {
-        productService.consumeProduct(dto.getUserId(), dto.getProductName(), dto.getAmount(), dto.getUnit());
-    }
-
-    @PostMapping("/return")
-    public void returnProduct(@RequestBody ConsumeProductDto dto) {
-        productService.returnProduct(dto.getUserId(), dto.getProductName(), dto.getAmount(), dto.getUnit());
     }
 }
