@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -128,115 +127,6 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
         productRepository.flush();
 
         return productMapper.toDto(product);
-    }
-
-    @Override
-    public void consumeProduct(int userId, String productName, double amount, Measure recipeUnit) {
-        circuitBreakerUserExists(userId);
-
-        List<Product> products = productRepository.findByNameIgnoreCaseAndOwnerIdIsNull(productName);
-        List<Product> productsUser = productRepository.findByNameIgnoreCaseAndOwnerId(productName, userId);
-        products.addAll(productsUser);
-
-        if (products.isEmpty()) {
-            throw new MissingException("Продукт '" + productName + "' не найден");
-        }
-
-        Product product = products.get(0);
-
-        LocalDate today = LocalDate.now();
-        List<ProductInstance> instances = productInstanceRepository.findByProductIdAndUserIdAndExpirationDateAfter(product.getId(), userId, today.minusDays(1))
-                .stream()
-                .sorted(Comparator.comparing(ProductInstance::getExpirationDate)).toList();
-
-        if (instances.isEmpty()) {
-            throw new MissingException("Нет доступных экземпляров продукта '" + productName + "' (возможно, истек срок годности)");
-        }
-
-
-        double remainingToConsume = amount;
-        List<Integer> idsToDelete = new ArrayList<>();
-
-        for (ProductInstance instance : instances) {
-            if (remainingToConsume <= 0.001) {
-                break;
-            }
-
-            Measure instanceUnit = instance.getUnit();
-            double currentCount = instance.getCount();
-
-            double neededInInstanceUnit = convertAmount(remainingToConsume, recipeUnit, instanceUnit);
-
-            if (currentCount >= neededInInstanceUnit) {
-                double newCount = currentCount - neededInInstanceUnit;
-
-                if (newCount <= 0.001) {
-                    idsToDelete.add(instance.getId());
-                } else {
-                    instance.setCount(newCount);
-                }
-
-                remainingToConsume = 0;
-
-            } else {
-                remainingToConsume -= convertAmount(currentCount, instanceUnit, recipeUnit);
-                idsToDelete.add(instance.getId());
-            }
-        }
-
-        if (remainingToConsume > 0.001) {
-            throw new MissingException("Недостаточно продукта '" + productName + "'. Требовалось: " + amount + ", доступно: " + (amount - remainingToConsume));
-        }
-
-        List<ProductInstance> toSave = new ArrayList<>();
-
-        for (ProductInstance instance : instances) {
-
-            if (!idsToDelete.contains(instance.getId())) {
-                toSave.add(instance);
-            }
-        }
-
-        if (!toSave.isEmpty()) {
-            productInstanceRepository.saveAll(toSave);
-        }
-
-        if (!idsToDelete.isEmpty()) {
-            productInstanceRepository.deleteAllById(idsToDelete);
-        }
-    }
-
-    @Override
-    public void returnProduct(int userId, String productName, double amount, Measure unit) {
-        circuitBreakerUserExists(userId);
-
-        List<Product> products = productRepository.findByNameIgnoreCaseAndOwnerIdIsNull(productName);
-        List<Product> productsUser = productRepository.findByNameIgnoreCaseAndOwnerId(productName, userId);
-        products.addAll(productsUser);
-
-        if (products.isEmpty()) {
-            throw new MissingException("Невозможно вернуть продукт '" + productName + "', так как он не найден");
-        }
-
-        Product product = products.get(0);
-        LocalDate today = LocalDate.now();
-
-        List<ProductInstance> activeInstances = productInstanceRepository.findByProductIdAndUserIdAndExpirationDateAfter(product.getId(), userId, today.minusDays(1)).stream()
-                .sorted(Comparator.comparing(ProductInstance::getExpirationDate)).toList();
-
-        if (!activeInstances.isEmpty()) {
-            ProductInstance targetInstance = activeInstances.get(0);
-
-            double amountToAdd = convertAmount(amount, unit, targetInstance.getUnit());
-
-            targetInstance.setCount(targetInstance.getCount() + amountToAdd);
-            productInstanceRepository.save(targetInstance);
-
-        } else {
-            ProductInstance newInstance = createProductInstance(product, userId, amount, unit, today);
-
-            productInstanceRepository.save(newInstance);
-        }
     }
 
     @Transactional
@@ -383,17 +273,6 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
         return result;
     }
 
-    private ProductInstance createProductInstance(Product product, int userId, double amount, Measure unit, LocalDate today) {
-        ProductInstance newInstance = new ProductInstance();
-        newInstance.setProduct(product);
-        newInstance.setUserId(userId);
-        newInstance.setCount(amount);
-        newInstance.setUnit(unit);
-        newInstance.setExpirationDate(today.plusDays(1));
-        newInstance.setCreatedAt(LocalDateTime.now());
-
-        return newInstance;
-    }
 
     private double convertToBase(double value, Measure unit) {
         if (unit == null) {
@@ -493,27 +372,6 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
         product.setMessage(message);
 
         return product;
-    }
-
-    private double convertAmount(double value, Measure from, Measure to) {
-        if (from.equals(to)) {
-            return value;
-        }
-
-        double baseValue;
-        if (from == Measure.KG) {
-            baseValue = value * 1000.0;
-        } else if (from == Measure.L) {
-            baseValue = value * 1000.0;
-        } else {
-            baseValue = value;
-        }
-
-        return switch (to) {
-            case KG, L -> baseValue / 1000.0;
-            default -> baseValue;
-        };
-
     }
 
     private void circuitBreakerUserExists(Integer userId){
