@@ -75,4 +75,11 @@ public class ProductControllerV2 {
     public void returnProduct(@RequestBody ConsumeProductDto dto) {
         productService.returnProduct(dto.getUserId(), dto.getProductName(), dto.getAmount(), dto.getUnit());
     }
+
+    @GetMapping("/ids/{id}")
+    ProductDto getProductsById(@RequestParam int userId,
+                               @PathVariable int id) {
+
+        return productService.getProductsByIds(userId, id);
+    }
 }

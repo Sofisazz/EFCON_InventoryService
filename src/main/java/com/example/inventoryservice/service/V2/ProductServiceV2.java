@@ -28,4 +28,6 @@ public interface ProductServiceV2 {
     void consumeProduct(int userId, String productName, double amount, Measure unit);
 
     void returnProduct(int userId, String productName, double amount, Measure unit);
+
+    ProductDto getProductsByIds(int userId, int productId);
 }

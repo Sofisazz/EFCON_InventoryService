@@ -239,6 +239,22 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
         }
     }
 
+    @Override
+    public ProductDto getProductsByIds(int userId, int productId) {
+        circuitBreakerUserExists(userId);
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new MissingException("Продукт с id '" + productId + "' не найден"));
+
+
+        if (product.getOwnerId() == null || product.getOwnerId().equals(userId)) {
+
+            return productMapper.toDto(product);
+        }
+
+        throw new MissingException("Продукт с id '" + productId + "' не доступен для пользователя с id '" + userId + "'");
+    }
+
     @Transactional
     @Override
     public void deleteProductById(Integer id, Integer userId) {
@@ -255,9 +271,8 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
 
         circuitBreakerUserExists(userId);
 
-        if (product.getOwnerId() == null) {
-            throw new ExistsException("Невозможно удалить продукт из глобальной базы. Вы можете удалить только свои личные продукты");
-        }
+        Optional.ofNullable(product.getOwnerId())
+                .orElseThrow(() -> new ExistsException("Невозможно удалить продукт из глобальной базы. Вы можете удалить только свои личные продукты"));
 
         if (!product.getOwnerId().equals(userId)) {
             throw new ExistsException("Вы не можете удалить этот продукт, так как он принадлежит другому пользователю");
@@ -402,6 +417,9 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
 
         return switch (unit) {
             case KG, L -> value * 1000.0;
+            case TSP -> value * 5.0;
+            case TBSP -> value * 15.0;
+            case CUP -> value * 240.0;
             default -> value;
         };
     }
@@ -413,6 +431,9 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
 
         return switch (targetUnit) {
             case KG, L -> baseValue / 1000.0;
+            case TSP -> baseValue / 5.0;
+            case TBSP -> baseValue / 15.0;
+            case CUP -> baseValue / 240.0;
             default -> baseValue;
         };
     }
@@ -500,17 +521,19 @@ public class ProductServiceImplV2 implements ProductServiceV2 {
             return value;
         }
 
-        double baseValue;
-        if (from == Measure.KG) {
-            baseValue = value * 1000.0;
-        } else if (from == Measure.L) {
-            baseValue = value * 1000.0;
-        } else {
-            baseValue = value;
-        }
+        double baseValue = switch (from) {
+            case KG, L -> value * 1000.0;
+            case TSP -> value * 5.0;
+            case TBSP -> value * 15.0;
+            case CUP -> value * 240.0;
+            default -> value;
+        };
 
         return switch (to) {
             case KG, L -> baseValue / 1000.0;
+            case TSP -> baseValue / 5.0;
+            case TBSP -> baseValue / 15.0;
+            case CUP -> baseValue / 240.0;
             default -> baseValue;
         };
 
